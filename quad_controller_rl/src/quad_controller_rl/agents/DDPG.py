@@ -201,7 +201,7 @@ class DDPG(BaseAgent):
             self.learn(experiences)
 
         if done:
-            self.write_states([self.episode_num, self.total_reward])
+            self.write_stats([self.episode_num, self.total_reward])
             self.episode_num += 1 
             self.reset_episode_vars()
 
