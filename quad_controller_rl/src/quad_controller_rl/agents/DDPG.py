@@ -226,7 +226,7 @@ class DDPG(BaseAgent):
         self.soft_update(self.critic_local.model, self.critic_target.model)
         self.soft_update(self.actor_local.model, self.actor_target.model)
 
-    def soft_update(self, local_model, target_model)
+    def soft_update(self, local_model, target_model):
         local_weights = np.array(local_model.get_weights())
         target_weights = np.array(target_model.get_weights())
 
