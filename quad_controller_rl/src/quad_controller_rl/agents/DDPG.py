@@ -11,11 +11,12 @@ Experience = namedtuple("Experience",
     field_names=["state", "action", "reward", "done", "next_state"])
 
 class ReplayBuffer():
-    def __init__(self, max_size=1000):
+    def __init__(self, max_size=10000):
         self.buffer = deque(maxlen=max_size)
 
-    def add(self, experience):
-        self.buffer.append(experience)
+    def add(self, state, action, reward, done, next_state):
+        e = Experience(state, action, reward, done, next_state)
+        self.buffer.append(e)
 
     def sample(self, batch_size):
         idx = np.random.choice(np.arange(len(self.buffer)),
@@ -54,7 +55,8 @@ class Actor:
         self.action_size = action_size
         self.action_low = action_low
         self.action_high = action_high
-        self.build_model
+        self.action_range = self.action_high - self.action_low
+        self.build_model()        
 
     def build_model(self):
         # Build Keras model
@@ -81,10 +83,11 @@ class Actor:
 
 class Critic:
     """Critic (Value) Model: Maps state-action pairs to Q-values"""
-    def ___init(self, state_size, action_size):
+    def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.build_model
+        self.build_model()
+
 
     def build_model(self):
         # Build state neural network branch
@@ -93,7 +96,7 @@ class Critic:
         net_states = layers.Dense(64, activation="relu")(net_states)
 
         # Build actions neural network branch
-        actions = layers.Inputs(shape=(self.action_size,), name="actions")
+        actions = layers.Input(shape=(self.action_size,), name="actions")
         net_actions = layers.Dense(32, activation="relu")(actions)
         net_actions = layers.Dense(64, activation="relu")(net_actions)
 
@@ -103,7 +106,6 @@ class Critic:
         net = layers.Dense(64, activation="relu")(net)
         Q_values = layers.Dense(1, name="q_values")(net)
         self.model = models.Model(input=[states, actions], output=Q_values)
-
         # Define optimiser and compile
         optimizer = optimizers.Adam()
         self.model.compile(optimizer=optimizer, loss="mse")
@@ -126,6 +128,9 @@ class DDPG(BaseAgent):
         self.action_size = np.prod(self.task.action_space.shape)
         self.action_low = self.task.action_space.low
         self.action_high = self.task.action_space.high
+        self.last_state = None
+        self.last_action = None
+        self.count = 0
 
         # Actor (Policy) initialisation
         self.actor_local = Actor(self.state_size, self.action_size, self.action_low, self.action_high)
@@ -149,6 +154,10 @@ class DDPG(BaseAgent):
         # Set noise process
         self.noise = OUNoise(self.action_size)
 
+        # Set logging
+        self.episode_num = 0
+        self.total_reward = 0     
+
         # Reset variables for new episode
         self.reset_episode_vars
 
@@ -157,7 +166,7 @@ class DDPG(BaseAgent):
         self.last_state = None
         self.last_action = None
         self.total_reward = 0.0
-        self.count = 0
+        self.count= 0
 
     def step(self, state, reward, done):
         """
@@ -176,15 +185,16 @@ class DDPG(BaseAgent):
         if self.last_state is not None and self.last_action is not None:
             self.total_reward += reward
             self.count += 1
-            self.memory.add(self.last_state, self.last_action, reward, state, done)
+            self.memory.add(self.last_state, self.last_action, reward, done, state)
 
         #Learn, if enough experience
-        if len(self.memory > self.batch_size):
+        if len(self.memory.buffer) > self.batch_size:
             experiences = self.memory.sample(self.batch_size)
             self.learn(experiences)
 
         if done:
             self.reset_episode_vars()
+            self.episode_num += 1 
 
         self.last_state = state
         self.last_action = action
@@ -193,7 +203,7 @@ class DDPG(BaseAgent):
     def act(self, state):
         """Run state data through neural network to return action"""
         state = np.reshape(state, [-1, self.state_size])
-        actions = self.actor_local.model.predict(states)
+        action = self.actor_local.model.predict(state)
         return action + self.noise.sample()
 
     def learn(self, experiences):
