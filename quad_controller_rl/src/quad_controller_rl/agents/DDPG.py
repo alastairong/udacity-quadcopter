@@ -120,7 +120,7 @@ class DDPG(BaseAgent):
         # Current environment information
         self.task = task
         self.state_size = np.prod(self.task.observation_space.shape)
-        self.state_low = self.task.observation_space.state_low
+        self.state_low = self.task.observation_space.state.low
         self.state_high = self.task.observation_space.high
         self.state_range = self.state_high - self.state_low
         self.action_size = np.prod(self.task.action_space.shape)
