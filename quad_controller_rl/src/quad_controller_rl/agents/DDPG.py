@@ -127,6 +127,12 @@ class DDPG(BaseAgent):
         self.action_size = np.prod(self.task.action_space.shape)
         self.action_low = self.task.action_space.low
         self.action_high = self.task.action_space.high
+        
+        # Memory initialisation
+        self.last_state = None
+        self.last_action = None
+        self.total_reward = 0.0
+        self.count = 0
 
         # Actor (Policy) initialisation
         self.actor_local = Actor(self.state_size, self.action_size, self.action_low, self.action_high)
@@ -194,8 +200,8 @@ class DDPG(BaseAgent):
     def act(self, state):
         """Run state data through neural network to return action"""
         state = np.reshape(state, [-1, self.state_size])
-        actions = self.actor_local.model.predict(states)
-        return action + self.noise.sample()
+        actions = self.actor_local.model.predict(state)
+        return actions + self.noise.sample()
 
     def learn(self, experiences):
         """
