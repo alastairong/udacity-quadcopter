@@ -54,7 +54,8 @@ class Actor:
         self.action_size = action_size
         self.action_low = action_low
         self.action_high = action_high
-        self.build_model
+        self.action_range = self.action_high - self.action_low	
+        self.build_model()
 
     def build_model(self):
         # Build Keras model
@@ -81,10 +82,10 @@ class Actor:
 
 class Critic:
     """Critic (Value) Model: Maps state-action pairs to Q-values"""
-    def ___init(self, state_size, action_size):
+    def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.build_model
+        self.build_model()
 
     def build_model(self):
         # Build state neural network branch
@@ -93,7 +94,7 @@ class Critic:
         net_states = layers.Dense(64, activation="relu")(net_states)
 
         # Build actions neural network branch
-        actions = layers.Inputs(shape=(self.action_size,), name="actions")
+        actions = layers.Input(shape=(self.action_size,), name="actions")
         net_actions = layers.Dense(32, activation="relu")(actions)
         net_actions = layers.Dense(64, activation="relu")(net_actions)
 
@@ -120,7 +121,7 @@ class DDPG(BaseAgent):
         # Current environment information
         self.task = task
         self.state_size = np.prod(self.task.observation_space.shape)
-        self.state_low = self.task.observation_space.state_low
+        self.state_low = self.task.observation_space.low
         self.state_high = self.task.observation_space.high
         self.state_range = self.state_high - self.state_low
         self.action_size = np.prod(self.task.action_space.shape)
@@ -226,7 +227,7 @@ class DDPG(BaseAgent):
         self.soft_update(self.critic_local.model, self.critic_target.model)
         self.soft_update(self.actor_local.model, self.actor_target.model)
 
-    def soft_update(self, local_model, target_model)
+    def soft_update(self, local_model, target_model):
         local_weights = np.array(local_model.get_weights())
         target_weights = np.array(target_model.get_weights())
 
