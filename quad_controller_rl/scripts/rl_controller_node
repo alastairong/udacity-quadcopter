@@ -16,8 +16,7 @@ from quad_controller_rl.srv import SetPose
 
 def get_subclass(cls, name):
     """Return a concrete subclass by name (classmethod)."""
-    types = {t.__name__: t for t in cls.__subclasses__()}
-    assert name in types, "Unknown type '{}' (must be a subclass of {})".format(name, cls.__name__)
+    types = {t.__name__: t for t in cls.__subclasses__()}    
     return types[name]
 
 class RLControllerNode:
