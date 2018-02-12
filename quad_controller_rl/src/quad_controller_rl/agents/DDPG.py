@@ -9,6 +9,7 @@ from collections import deque, namedtuple
 import os
 import pandas as pd
 from quad_controller_rl import util
+import h5py
 
 Experience = namedtuple("Experience",
     field_names=["state", "action", "reward", "done", "next_state"])
@@ -166,9 +167,11 @@ class DDPG(BaseAgent):
             df_stats = pd.read_csv(self.stats_filename) # If stats already exists, load it
             self.total_reward = df_stats.tail(1)['total_reward']
             self.episode_num = df_stats.tail(1)['episode']
+            print("save file found")
         except:
             self.total_reward = 0
             self.episode_num = 1
+            print("no save file found")
         print("Saving {} to {}. Starting at episode {}".format(self.stats_columns, self.stats_folder, self.episode_num))  # [debug]
 
         # Actor (Policy) initialisation
@@ -179,7 +182,6 @@ class DDPG(BaseAgent):
             self.actor_target.model.set_weights(self.actor_target_weights)
         except:
             self.actor_target.model.set_weights(self.actor_local.model.get_weights())
-
         # Critic (Value) initialisation
         self.critic_local = Critic(self.state_size, self.action_size)
         self.critic_target = Critic(self.state_size, self.action_size)
@@ -188,7 +190,6 @@ class DDPG(BaseAgent):
             self.critic_target.model.set_weights(self.critic_target_weights)
         except:
             self.critic_target.model.set_weights(self.critic_local.model.get_weights())
-
         # Set replay buffer
         self.buffer_size = 100000
         self.batch_size = 64
@@ -226,10 +227,12 @@ class DDPG(BaseAgent):
 
         # Calculate td_error for prioritisation
 
-        Q_targets_next = self.critic_target.model.predict(states, actions)
-        Q_targets_old = self.critic_target.model.predict(self.last_state, self.last_action)
-        td_error = reward + self.gamma * Q_targets_next - Q_targets
-
+        Q_targets_next = self.critic_target.model.predict([state, action]).item()
+        try:
+                Q_targets_old = self.critic_target.model.predict([self.last_state, self.last_action]).item()
+        except:
+                Q_targets_old = Q_targets_next
+        td_error = abs(reward + self.gamma * Q_targets_next - Q_targets_old)
         # Save experience
         if self.last_state is not None and self.last_action is not None:
             self.total_reward += reward
@@ -246,10 +249,10 @@ class DDPG(BaseAgent):
             print(self.total_reward)
             self.episode_num += 1
             self.reset_episode_vars()
-            self.actor_local.save_weights(self.actor_local_weights)
-            self.actor_target.save_weights(self.actor_target_weights)
-            self.critic_local.save_weights(self.critic_local_weights)
-            self.critic_target.save_weights(self.critic_target_weights)
+            self.actor_local.model.save_weights(self.actor_local_weights)
+            self.actor_target.model.save_weights(self.actor_target_weights)
+            self.critic_local.model.save_weights(self.critic_local_weights)
+            self.critic_target.model.save_weights(self.critic_target_weights)
 
         self.last_state = state # think these should be moved before "done" so they get reset between episodes?
         self.last_action = action # think these should be moved before "done" so they get reset between episodes?

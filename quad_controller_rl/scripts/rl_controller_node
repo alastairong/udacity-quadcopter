@@ -43,7 +43,7 @@ class RLControllerNode:
 
         # Other variables
         self.episode = 0
-
+        print("RL controller node initialized")
     def start(self):
         # Wait till quad_rotor services are ready
         rospy.wait_for_service('/quad_rotor/reset_orientation')
@@ -57,7 +57,6 @@ class RLControllerNode:
 
         # Reset to begin first episode
         self.reset()
-
         # Loop indefinitely
         self.loop()
 
