@@ -75,6 +75,8 @@ class Actor:
         NN = layers.Dense(32, activation="relu")(states)
         NN = layers.Dense(64, activation="relu")(NN)
         NN = layers.Dense(128, activation="relu")(NN)
+        NN = layers.Dense(256, activation="relu")(NN)
+        NN = layers.Dense(256, activation="relu")(NN)
         raw_actions = layers.Dense(self.action_size, activation="sigmoid", name="raw_actions")(NN)
         actions = layers.Lambda(lambda x: (x * self.action_range) + self.action_low, name="actions")(raw_actions)
         self.model = models.Model(inputs=states, output=actions)
@@ -105,16 +107,20 @@ class Critic:
         states = layers.Input(shape=(self.state_size,), name="states")
         net_states = layers.Dense(32, activation="relu")(states)
         net_states = layers.Dense(64, activation="relu")(net_states)
+        net_states = layers.Dense(64, activation="relu")(net_states)
 
         # Build actions neural network branch
         actions = layers.Input(shape=(self.action_size,), name="actions")
         net_actions = layers.Dense(32, activation="relu")(actions)
         net_actions = layers.Dense(64, activation="relu")(net_actions)
+        net_actions = layers.Dense(64, activation="relu")(net_actions)
 
         # Combine branches and compile
         net = layers.Add()([net_states, net_actions])
         net = layers.Activation("relu")(net)
+        net = layers.Dense(64, activation="relu")(net) 
         net = layers.Dense(128, activation="relu")(net)
+        net = layers.Dense(256, activation="relu")(net)
         Q_values = layers.Dense(1, name="q_values")(net)
         self.model = models.Model(input=[states, actions], output=Q_values)
         # Define optimiser and compile
@@ -132,13 +138,13 @@ class DDPG(BaseAgent):
     def __init__(self, task):
         # Current environment information
         self.task = task
-        self.state_size = np.prod(self.task.observation_space.shape)
-        self.state_low = self.task.observation_space.low
-        self.state_high = self.task.observation_space.high
+        self.state_size = 3 # position only. No orientation
+        self.state_low = self.task.observation_space.low[0:3]
+        self.state_high = self.task.observation_space.high[0:3]
         self.state_range = self.state_high - self.state_low
-        self.action_size = np.prod(self.task.action_space.shape)
-        self.action_low = self.task.action_space.low
-        self.action_high = self.task.action_space.high
+        self.action_size = 3 # force only. No torque
+        self.action_low = self.task.action_space.low[0:3]
+        self.action_high = self.task.action_space.high[0:3]
         self.last_state = None
         self.last_action = None
         self.count = 0
@@ -163,13 +169,13 @@ class DDPG(BaseAgent):
         self.stats_columns = ['episode', 'total_reward']  # specify columns to save
 
         # Initialise stats logging
+        self.total_reward = 0.0
         try:
             df_stats = pd.read_csv(self.stats_filename) # If stats already exists, load it
-            self.total_reward = df_stats.tail(1)['total_reward']
-            self.episode_num = df_stats.tail(1)['episode']
+            self.episode_num = df_stats.tail(1)['episode'].item() + 1
             print("save file found")
         except:
-            self.total_reward = 0
+            self.total_reward = 0.0
             self.episode_num = 1
             print("no save file found")
         print("Saving {} to {}. Starting at episode {}".format(self.stats_columns, self.stats_folder, self.episode_num))  # [debug]
@@ -178,18 +184,22 @@ class DDPG(BaseAgent):
         self.actor_local = Actor(self.state_size, self.action_size, self.action_low, self.action_high)
         self.actor_target = Actor(self.state_size, self.action_size, self.action_low, self.action_high)
         try:
-            self.actor_local.model.set_weights(self.actor_local_weights)
-            self.actor_target.model.set_weights(self.actor_target_weights)
+            self.actor_local.model.load_weights(self.actor_local_weights)
+            self.actor_target.model.load_weights(self.actor_target_weights)
+            print("saved actor weights loaded")
         except:
             self.actor_target.model.set_weights(self.actor_local.model.get_weights())
+            print("new actor weights initialised")
         # Critic (Value) initialisation
         self.critic_local = Critic(self.state_size, self.action_size)
         self.critic_target = Critic(self.state_size, self.action_size)
         try:
-            self.critic_local.model.set_weights(self.critic_local_weights)
-            self.critic_target.model.set_weights(self.critic_target_weights)
+            self.critic_local.model.load_weights(self.critic_local_weights)
+            self.critic_target.model.load_weights(self.critic_target_weights)
+            print("saved critic weights loaded")
         except:
             self.critic_target.model.set_weights(self.critic_local.model.get_weights())
+            print("new critic weights initialised")
         # Set replay buffer
         self.buffer_size = 100000
         self.batch_size = 64
@@ -197,7 +207,7 @@ class DDPG(BaseAgent):
 
         # Algorithm parameters
         self.gamma = 0.99
-        self.tau = 0.001
+        self.tau = 0.0005
 
         # Set noise process
         self.noise = OUNoise(self.action_size)
@@ -212,6 +222,17 @@ class DDPG(BaseAgent):
         self.total_reward = 0.0
         self.count= 0
 
+
+    def postprocess_action(self, action):
+        """return complete action vector including torques (set as zero)"""
+        complete_action = np.zeros(self.task.action_space.shape)
+        complete_action[0:3] = action
+        return complete_action
+
+    def preprocess_state(self, state):
+        return state[0:3] # Position only
+
+
     def step(self, state, reward, done):
         """
         Choose and return an action based on current
@@ -219,6 +240,7 @@ class DDPG(BaseAgent):
         learn if enough samples are available
         """
         # Normalise state between [0, 1]
+        state = self.preprocess_state(state)
         state = (state - self.state_low) / self.state_range
         state = state.reshape(1, -1)
 
@@ -257,7 +279,7 @@ class DDPG(BaseAgent):
         self.last_state = state # think these should be moved before "done" so they get reset between episodes?
         self.last_action = action # think these should be moved before "done" so they get reset between episodes?
 
-        return action
+        return self.postprocess_action(action)
 
     def act(self, state):
         """Run state data through neural network to return action"""

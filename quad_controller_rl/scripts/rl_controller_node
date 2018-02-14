@@ -42,7 +42,7 @@ class RLControllerNode:
         self.task.set_agent(self.agent)
 
         # Other variables
-        self.episode = 0
+        self.episode = self.agent.episode_num - 1
         print("RL controller node initialized")
     def start(self):
         # Wait till quad_rotor services are ready
